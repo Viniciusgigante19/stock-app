@@ -1,10 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
   TextInput,
   Pressable,
-  FlatList,
+  SectionList,
   Image,
   Alert,
   Modal,
@@ -23,10 +23,16 @@ import {
   zerarEstoqueLoja,
   type ItemEstoque,
 } from '@/db/estoque';
+import { useAppTheme, type Cores } from '@/contexts/theme-context';
+
+type Secao = { titulo: string; data: ItemEstoque[] };
 
 export default function LojaDetalheScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const lojaId = Number(id);
+
+  const { cores } = useAppTheme();
+  const styles = useMemo(() => criarEstilos(cores), [cores]);
 
   const [loja, setLoja] = useState<Loja | null>(null);
   const [itens, setItens] = useState<ItemEstoque[]>([]);
@@ -48,6 +54,25 @@ export default function LojaDetalheScreen() {
       carregar();
     }, [carregar])
   );
+
+  const secoes: Secao[] = useMemo(() => {
+    const grupos: Secao[] = [];
+    for (const item of itens) {
+      const titulo = item.categoria_nome
+        ? item.subcategoria_nome
+          ? `${item.categoria_nome} — ${item.subcategoria_nome}`
+          : item.categoria_nome
+        : 'Sem categoria';
+
+      const ultimoGrupo = grupos[grupos.length - 1];
+      if (ultimoGrupo && ultimoGrupo.titulo === titulo) {
+        ultimoGrupo.data.push(item);
+      } else {
+        grupos.push({ titulo, data: [item] });
+      }
+    }
+    return grupos;
+  }, [itens]);
 
   async function abrirModalAdicionar() {
     const todosProdutos = await listarProdutos();
@@ -132,15 +157,21 @@ export default function LojaDetalheScreen() {
         <Text style={styles.botaoAdicionarProdutoTexto}>+ Adicionar produto do catálogo</Text>
       </Pressable>
 
-      <FlatList
-        data={itens}
+      <SectionList
+        sections={secoes}
         keyExtractor={(item) => String(item.produto_id)}
         contentContainerStyle={{ paddingBottom: 24 }}
+        stickySectionHeadersEnabled
         ListEmptyComponent={
           <Text style={styles.vazio}>
             Nenhum produto nesta loja ainda. Toque em "Adicionar produto do catálogo" acima.
           </Text>
         }
+        renderSectionHeader={({ section }) => (
+          <View style={styles.secaoCabecalho}>
+            <Text style={styles.secaoTitulo}>{section.titulo}</Text>
+          </View>
+        )}
         renderItem={({ item }) => {
           const imagem = fonteImagem(item);
           return (
@@ -193,12 +224,12 @@ export default function LojaDetalheScreen() {
             <TextInput
               style={styles.modalBusca}
               placeholder="Buscar produto"
-              placeholderTextColor="#888"
+              placeholderTextColor={cores.placeholder}
               value={buscaCatalogo}
               onChangeText={setBuscaCatalogo}
             />
-            <FlatList
-              data={catalogoFiltrado}
+            <SectionList
+              sections={[{ titulo: '', data: catalogoFiltrado }]}
               keyExtractor={(item) => String(item.id)}
               style={{ maxHeight: 360 }}
               ListEmptyComponent={
@@ -221,95 +252,94 @@ export default function LojaDetalheScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 16 },
-  cabecalho: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
-    marginBottom: 12,
-  },
-  titulo: { fontSize: 24, fontWeight: '700', color: '#fff', flexShrink: 1 },
-  botaoZerar: {
-    backgroundColor: '#7f1d1d',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-  },
-  botaoZerarTexto: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  botaoAdicionarProduto: {
-    borderWidth: 1,
-    borderColor: '#2563eb',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  botaoAdicionarProdutoTexto: { color: '#2563eb', fontWeight: '600' },
-  itemLinha: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-  },
-  itemImagem: { width: 44, height: 44, borderRadius: 8, backgroundColor: '#222' },
-  itemImagemVazia: {},
-  itemNome: { flex: 1, marginLeft: 10, marginRight: 8, color: '#fff', fontSize: 15, fontWeight: '500' },
-  quantidades: { flexDirection: 'row', gap: 8 },
-  campoQuantidade: { alignItems: 'center' },
-  rotuloQuantidade: { color: '#888', fontSize: 10, marginBottom: 2 },
-  inputQuantidade: {
-    width: 52,
-    borderWidth: 1,
-    borderColor: '#444',
-    borderRadius: 8,
-    paddingVertical: 6,
-    textAlign: 'center',
-    color: '#fff',
-    fontSize: 15,
-  },
-  botaoRemover: {
-    marginLeft: 10,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#333',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  botaoRemoverTexto: { color: '#fff', fontSize: 14 },
-  vazio: { textAlign: 'center', marginTop: 40, color: '#888', fontSize: 15, paddingHorizontal: 20 },
-  modalFundo: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  modalConteudo: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 20,
-    maxHeight: '80%',
-  },
-  modalTitulo: { fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 12 },
-  modalBusca: {
-    borderWidth: 1,
-    borderColor: '#444',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: '#fff',
-    marginBottom: 12,
-  },
-  catalogoItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-  },
-  catalogoItemTexto: { color: '#fff', fontSize: 15, flex: 1 },
-  catalogoItemMais: { color: '#2563eb', fontWeight: '600', fontSize: 13 },
-  modalFechar: { marginTop: 12, paddingVertical: 12, alignItems: 'center' },
-  modalFecharTexto: { color: '#888', fontWeight: '600' },
-});
+function criarEstilos(cores: Cores) {
+  return StyleSheet.create({
+    container: { flex: 1, paddingHorizontal: 16, paddingTop: 14, backgroundColor: cores.fundo },
+    cabecalho: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 12,
+      marginBottom: 12,
+    },
+    titulo: { fontSize: 24, fontWeight: '700', color: cores.texto, flexShrink: 1 },
+    botaoZerar: { backgroundColor: cores.perigo, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8 },
+    botaoZerarTexto: { color: '#fff', fontWeight: '600', fontSize: 13 },
+    botaoAdicionarProduto: {
+      borderWidth: 1,
+      borderColor: cores.primaria,
+      borderRadius: 10,
+      paddingVertical: 12,
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    botaoAdicionarProdutoTexto: { color: cores.primaria, fontWeight: '600' },
+    secaoCabecalho: { backgroundColor: cores.fundo, paddingVertical: 8 },
+    secaoTitulo: { color: cores.primaria, fontWeight: '700', fontSize: 14 },
+    itemLinha: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: cores.borda,
+    },
+    itemImagem: { width: 44, height: 44, borderRadius: 8, backgroundColor: cores.fundoCartao },
+    itemImagemVazia: {},
+    itemNome: { flex: 1, marginLeft: 10, marginRight: 8, color: cores.texto, fontSize: 15, fontWeight: '500' },
+    quantidades: { flexDirection: 'row', gap: 8 },
+    campoQuantidade: { alignItems: 'center' },
+    rotuloQuantidade: { color: cores.textoSecundario, fontSize: 10, marginBottom: 2 },
+    inputQuantidade: {
+      width: 52,
+      borderWidth: 1,
+      borderColor: cores.borda,
+      borderRadius: 8,
+      paddingVertical: 6,
+      textAlign: 'center',
+      color: cores.texto,
+      fontSize: 15,
+    },
+    botaoRemover: {
+      marginLeft: 10,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: cores.borda,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    botaoRemoverTexto: { color: cores.texto, fontSize: 14 },
+    vazio: { textAlign: 'center', marginTop: 40, color: cores.textoSecundario, fontSize: 15, paddingHorizontal: 20 },
+    modalFundo: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+    modalConteudo: {
+      backgroundColor: cores.fundoCartao,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      padding: 20,
+      maxHeight: '80%',
+    },
+    modalTitulo: { fontSize: 20, fontWeight: '700', color: cores.texto, marginBottom: 12 },
+    modalBusca: {
+      borderWidth: 1,
+      borderColor: cores.borda,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      fontSize: 15,
+      color: cores.texto,
+      marginBottom: 12,
+    },
+    catalogoItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: cores.borda,
+    },
+    catalogoItemTexto: { color: cores.texto, fontSize: 15, flex: 1 },
+    catalogoItemMais: { color: cores.primaria, fontWeight: '600', fontSize: 13 },
+    modalFechar: { marginTop: 12, paddingVertical: 12, alignItems: 'center' },
+    modalFecharTexto: { color: cores.textoSecundario, fontWeight: '600' },
+  });
+}

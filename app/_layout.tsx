@@ -4,16 +4,40 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { initDatabase } from '@/db/database';
+import { AppThemeProvider, useAppTheme } from '@/contexts/theme-context';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
+function LayoutInterno() {
+  const { modo, cores, pronto } = useAppTheme();
+
+  if (!pronto) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: cores.fundo }}>
+        <ActivityIndicator size="large" color={cores.primaria} />
+      </View>
+    );
+  }
+
+  return (
+    <ThemeProvider value={modo === 'escuro' ? DarkTheme : DefaultTheme}>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        <Stack.Screen name="loja/[id]" options={{ title: '' }} />
+        <Stack.Screen name="categorias" options={{ title: 'Categorias' }} />
+        <Stack.Screen name="subcategorias/[categoriaId]" options={{ title: 'Subcategorias' }} />
+        <Stack.Screen name="produtos-ordem/[subcategoriaId]" options={{ title: 'Ordem dos produtos' }} />
+      </Stack>
+      <StatusBar style={modo === 'escuro' ? 'light' : 'dark'} />
+    </ThemeProvider>
+  );
+}
+
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   const [dbReady, setDbReady] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
 
@@ -27,7 +51,6 @@ export default function RootLayout() {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
         <StatusBar style="auto" />
-        {/* Se aparecer esse erro, algo no schema SQL está errado */}
         <ActivityIndicator size="large" color="red" />
       </View>
     );
@@ -42,12 +65,8 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <AppThemeProvider>
+      <LayoutInterno />
+    </AppThemeProvider>
   );
 }

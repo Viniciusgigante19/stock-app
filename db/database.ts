@@ -30,14 +30,38 @@ export async function initDatabase() {
     );
 
     CREATE INDEX IF NOT EXISTS idx_estoque_loja ON estoque_loja(loja_id);
+
+    CREATE TABLE IF NOT EXISTS categorias (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT NOT NULL UNIQUE,
+      ordem INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS subcategorias (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      categoria_id INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
+      nome TEXT NOT NULL,
+      ordem INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS configuracoes (
+      chave TEXT PRIMARY KEY,
+      valor TEXT
+    );
   `);
 
-  // Migração: adiciona a coluna codigo_barras se ainda não existir.
-  // Bancos criados antes desta versão não têm essa coluna.
-  try {
-    await db.execAsync('ALTER TABLE produtos ADD COLUMN codigo_barras TEXT;');
-  } catch (err) {
-    // Coluna já existe — ignora o erro
+  // Migrações: adiciona colunas novas em bancos já existentes, ignorando erro se já existirem.
+  const migracoes = [
+    'ALTER TABLE produtos ADD COLUMN codigo_barras TEXT;',
+    'ALTER TABLE produtos ADD COLUMN subcategoria_id INTEGER;',
+    'ALTER TABLE produtos ADD COLUMN ordem INTEGER NOT NULL DEFAULT 0;',
+  ];
+  for (const sql of migracoes) {
+    try {
+      await db.execAsync(sql);
+    } catch (err) {
+      // Coluna já existe — ignora
+    }
   }
 
   return db;
