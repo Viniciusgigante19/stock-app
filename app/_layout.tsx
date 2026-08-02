@@ -6,6 +6,7 @@ import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
 import { initDatabase } from '@/db/database';
 import { AppThemeProvider, useAppTheme } from '@/contexts/theme-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -22,15 +23,17 @@ function LayoutInterno() {
     );
   }
 
+  // Margem extra além da área segura padrão — compensa câmeras/notch que alguns
+  // aparelhos Android não calculam corretamente na altura do cabeçalho nativo.
   return (
     <ThemeProvider value={modo === 'escuro' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-        <Stack.Screen name="loja/[id]" options={{ title: '' }} />
-        <Stack.Screen name="categorias" options={{ title: 'Categorias' }} />
-        <Stack.Screen name="subcategorias/[categoriaId]" options={{ title: 'Subcategorias' }} />
-        <Stack.Screen name="produtos-ordem/[subcategoriaId]" options={{ title: 'Ordem dos produtos' }} />
+        <Stack.Screen name="loja/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="categorias" options={{ headerShown: false }} />
+        <Stack.Screen name="subcategorias/[categoriaId]" options={{ headerShown: false }} />
+        <Stack.Screen name="produtos-ordem/[subcategoriaId]" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style={modo === 'escuro' ? 'light' : 'dark'} />
     </ThemeProvider>

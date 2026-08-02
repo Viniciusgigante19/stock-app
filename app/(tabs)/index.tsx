@@ -64,7 +64,7 @@ export default function LojasScreen() {
       <View style={styles.inputRow}>
         <TextInput
           style={styles.input}
-          placeholder="Nome da loja (ex: Nagumo 57)"
+          placeholder="Nome da Loja Cliente"
           placeholderTextColor={cores.placeholder}
           value={nomeNovaLoja}
           onChangeText={setNomeNovaLoja}

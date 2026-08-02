@@ -185,18 +185,6 @@ export default function LojaDetalheScreen() {
               <Text style={styles.itemNome} numberOfLines={2}>
                 {item.nome}
               </Text>
-
-              <View style={styles.quantidades}>
-                <View style={styles.campoQuantidade}>
-                  <Text style={styles.rotuloQuantidade}>Depósito</Text>
-                  <TextInput
-                    style={styles.inputQuantidade}
-                    keyboardType="numeric"
-                    value={item.estoque === null ? '' : String(item.estoque)}
-                    onChangeText={(v) => atualizarLocal(item.produto_id, 'estoque', v)}
-                    onEndEditing={(e) => salvarQuantidade(item.produto_id, 'estoque', e.nativeEvent.text)}
-                  />
-                </View>
                 <View style={styles.campoQuantidade}>
                   <Text style={styles.rotuloQuantidade}>Vendas</Text>
                   <TextInput
@@ -205,6 +193,18 @@ export default function LojaDetalheScreen() {
                     value={item.prateleira === null ? '' : String(item.prateleira)}
                     onChangeText={(v) => atualizarLocal(item.produto_id, 'prateleira', v)}
                     onEndEditing={(e) => salvarQuantidade(item.produto_id, 'prateleira', e.nativeEvent.text)}
+                  />
+                </View>
+
+                <View style={styles.quantidades}>
+                <View style={styles.campoQuantidade}>
+                  <Text style={styles.rotuloQuantidade}>Depósito</Text>
+                  <TextInput
+                    style={styles.inputQuantidade}
+                    keyboardType="numeric"
+                    value={item.estoque === null ? '' : String(item.estoque)}
+                    onChangeText={(v) => atualizarLocal(item.produto_id, 'estoque', v)}
+                    onEndEditing={(e) => salvarQuantidade(item.produto_id, 'estoque', e.nativeEvent.text)}
                   />
                 </View>
               </View>

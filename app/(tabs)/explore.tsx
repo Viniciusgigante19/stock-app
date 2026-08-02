@@ -4,7 +4,7 @@ import {
   Text,
   TextInput,
   Pressable,
-  FlatList,
+  SectionList,
   Image,
   Alert,
   Modal,
@@ -16,7 +16,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 
 import { listarProdutos, criarProduto, atualizarProduto, excluirProduto, type Produto } from '@/db/produtos';
-import { listarCategorias, listarSubcategorias, type Categoria, type Subcategoria } from '@/db/categorias';
+import {
+  listarCategorias,
+  listarSubcategorias,
+  listarTodasSubcategoriasComCategoria,
+  type Categoria,
+  type Subcategoria,
+} from '@/db/categorias';
 import { useAppTheme, type Cores } from '@/contexts/theme-context';
 
 const MARGEM_TOPO_EXTRA = 14;
@@ -26,6 +32,9 @@ export default function ProdutosScreen() {
   const styles = useMemo(() => criarEstilos(cores), [cores]);
 
   const [produtos, setProdutos] = useState<Produto[]>([]);
+const [mapaSubcategorias, setMapaSubcategorias] = useState<
+    Record<number, { nome: string; categoria_nome: string; categoria_ordem: number; ordem: number }>
+  >({});
   const [busca, setBusca] = useState('');
   const [modalVisivel, setModalVisivel] = useState(false);
   const [produtoEditando, setProdutoEditando] = useState<Produto | null>(null);
@@ -40,8 +49,27 @@ export default function ProdutosScreen() {
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<number | null>(null);
   const [subcategoriaSelecionada, setSubcategoriaSelecionada] = useState<number | null>(null);
 
-  const carregarProdutos = useCallback(async () => {
-    const dados = await listarProdutos(busca.trim() || undefined);
+const carregarProdutos = useCallback(async () => {
+    const [dados, todasSubs, todasCats] = await Promise.all([
+      listarProdutos(busca.trim() || undefined),
+      listarTodasSubcategoriasComCategoria(),
+      listarCategorias(),
+    ]);
+
+    const ordemCategoria: Record<number, number> = {};
+    todasCats.forEach((c) => (ordemCategoria[c.id] = c.ordem));
+
+    const mapa: Record<number, { nome: string; categoria_nome: string; categoria_ordem: number; ordem: number }> = {};
+    todasSubs.forEach((s) => {
+      mapa[s.id] = {
+        nome: s.nome,
+        categoria_nome: s.categoria_nome,
+        categoria_ordem: ordemCategoria[s.categoria_id] ?? 9999,
+        ordem: s.ordem,
+      };
+    });
+
+    setMapaSubcategorias(mapa);
     setProdutos(dados);
   }, [busca]);
 
@@ -189,6 +217,41 @@ export default function ProdutosScreen() {
     return null;
   }
 
+  const secoes = useMemo(() => {
+    type Secao = { titulo: string; ordemCategoria: number; ordemSub: number; data: Produto[] };
+    const grupos: Record<string, Secao> = {};
+
+    for (const produto of produtos) {
+      let chave: string;
+      let titulo: string;
+      let ordemCategoria: number;
+      let ordemSub: number;
+
+      if (produto.subcategoria_id && mapaSubcategorias[produto.subcategoria_id]) {
+        const info = mapaSubcategorias[produto.subcategoria_id];
+        chave = String(produto.subcategoria_id);
+        titulo = `${info.categoria_nome} — ${info.nome}`;
+        ordemCategoria = info.categoria_ordem;
+        ordemSub = info.ordem;
+      } else {
+        chave = 'sem-categoria';
+        titulo = 'Sem categoria';
+        ordemCategoria = 9999;
+        ordemSub = 9999;
+      }
+
+      if (!grupos[chave]) {
+        grupos[chave] = { titulo, ordemCategoria, ordemSub, data: [] };
+      }
+      grupos[chave].data.push(produto);
+    }
+
+    return Object.values(grupos).sort((a, b) => {
+      if (a.ordemCategoria !== b.ordemCategoria) return a.ordemCategoria - b.ordemCategoria;
+      return a.ordemSub - b.ordemSub;
+    });
+  }, [produtos, mapaSubcategorias]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.cabecalho}>
@@ -211,13 +274,19 @@ export default function ProdutosScreen() {
         </Pressable>
       </View>
 
-      <FlatList
-        data={produtos}
+ <SectionList
+        sections={secoes}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={{ paddingBottom: 24 }}
+        stickySectionHeadersEnabled
         ListEmptyComponent={
           <Text style={styles.vazio}>Nenhum produto cadastrado ainda. Adicione um acima.</Text>
         }
+        renderSectionHeader={({ section }) => (
+          <View style={styles.secaoCabecalho}>
+            <Text style={styles.secaoTitulo}>{section.titulo}</Text>
+          </View>
+        )}
         renderItem={({ item }) => {
           const imagem = fonteImagem(item);
           return (
@@ -412,6 +481,8 @@ function criarEstilos(cores: Cores) {
       alignItems: 'center',
     },
     botaoAdicionarTexto: { color: '#fff', fontSize: 24, fontWeight: '700' },
+    secaoCabecalho: { backgroundColor: cores.fundo, paddingVertical: 8 },
+    secaoTitulo: { color: cores.primaria, fontWeight: '700', fontSize: 14 },
     produtoItem: {
       flexDirection: 'row',
       alignItems: 'center',
