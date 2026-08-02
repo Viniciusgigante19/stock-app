@@ -283,7 +283,7 @@ function criarEstilos(cores: Cores) {
       borderBottomWidth: 1,
       borderBottomColor: cores.borda,
     },
-    itemImagem: { width: 44, height: 44, borderRadius: 8, backgroundColor: cores.fundoCartao },
+    itemImagem: { width: 68, height: 68, borderRadius: 10, backgroundColor: cores.fundoCartao },
     itemImagemVazia: {},
     itemNome: { flex: 1, marginLeft: 10, marginRight: 8, color: cores.texto, fontSize: 15, fontWeight: '500' },
     quantidades: { flexDirection: 'row', gap: 8 },
