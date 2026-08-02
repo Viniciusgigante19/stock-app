@@ -14,7 +14,7 @@ export async function listarSubcategorias(categoriaId: number): Promise<Subcateg
   );
 }
 
-export async function listarTodasSubcategoriasComCategoria(): Promise
+export async function listarTodasSubcategoriasComCategoria(): Promise <
   (Subcategoria & { categoria_nome: string })[]
 > {
   return getDb().getAllAsync(
