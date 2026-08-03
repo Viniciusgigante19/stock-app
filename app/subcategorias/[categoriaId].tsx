@@ -108,6 +108,7 @@ export default function SubcategoriasScreen() {
 
       <FlatList
         data={subcategorias}
+        style={{ flex: 1 }}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={{ paddingBottom: 24 }}
         ListEmptyComponent={

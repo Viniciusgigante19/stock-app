@@ -23,8 +23,6 @@ function LayoutInterno() {
     );
   }
 
-  // Margem extra além da área segura padrão — compensa câmeras/notch que alguns
-  // aparelhos Android não calculam corretamente na altura do cabeçalho nativo.
   return (
     <ThemeProvider value={modo === 'escuro' ? DarkTheme : DefaultTheme}>
       <Stack>

@@ -10,7 +10,10 @@ export async function initDatabase() {
 
     CREATE TABLE IF NOT EXISTS lojas (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nome TEXT NOT NULL UNIQUE
+      nome TEXT NOT NULL UNIQUE,
+      imagem_tipo TEXT NOT NULL DEFAULT 'nenhuma',
+      imagem_url TEXT,
+      imagem_arquivo TEXT
     );
 
     CREATE TABLE IF NOT EXISTS produtos (
@@ -51,10 +54,13 @@ export async function initDatabase() {
   `);
 
   // Migrações: adiciona colunas novas em bancos já existentes, ignorando erro se já existirem.
-  const migracoes = [
+ const migracoes = [
     'ALTER TABLE produtos ADD COLUMN codigo_barras TEXT;',
     'ALTER TABLE produtos ADD COLUMN subcategoria_id INTEGER;',
     'ALTER TABLE produtos ADD COLUMN ordem INTEGER NOT NULL DEFAULT 0;',
+    "ALTER TABLE lojas ADD COLUMN imagem_tipo TEXT NOT NULL DEFAULT 'nenhuma';",
+    'ALTER TABLE lojas ADD COLUMN imagem_url TEXT;',
+    'ALTER TABLE lojas ADD COLUMN imagem_arquivo TEXT;',
   ];
   for (const sql of migracoes) {
     try {

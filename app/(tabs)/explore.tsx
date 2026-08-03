@@ -28,6 +28,7 @@ import { useAppTheme, type Cores } from '@/contexts/theme-context';
 const MARGEM_TOPO_EXTRA = 14;
 
 export default function ProdutosScreen() {
+  
   const { cores } = useAppTheme();
   const styles = useMemo(() => criarEstilos(cores), [cores]);
 
@@ -49,6 +50,7 @@ const [mapaSubcategorias, setMapaSubcategorias] = useState<
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<number | null>(null);
   const [subcategoriaSelecionada, setSubcategoriaSelecionada] = useState<number | null>(null);
 
+  
 const carregarProdutos = useCallback(async () => {
     const [dados, todasSubs, todasCats] = await Promise.all([
       listarProdutos(busca.trim() || undefined),
@@ -276,6 +278,7 @@ const carregarProdutos = useCallback(async () => {
 
  <SectionList
         sections={secoes}
+        style={{ flex: 1 }}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={{ paddingBottom: 24 }}
         stickySectionHeadersEnabled

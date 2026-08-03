@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Image,
   Alert,
   Modal,
+  Keyboard,
   StyleSheet,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, Stack } from 'expo-router';
@@ -26,6 +27,11 @@ import {
 import { useAppTheme, type Cores } from '@/contexts/theme-context';
 
 type Secao = { titulo: string; data: ItemEstoque[] };
+type CampoQuantidade = 'estoque' | 'prateleira';
+
+type PendenciaSalvar = { produtoId: number; campo: CampoQuantidade; valor: string };
+
+const ATRASO_SALVAMENTO_MS = 600;
 
 export default function LojaDetalheScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -40,6 +46,16 @@ export default function LojaDetalheScreen() {
   const [catalogo, setCatalogo] = useState<Produto[]>([]);
   const [buscaCatalogo, setBuscaCatalogo] = useState('');
 
+  // Refs para navegação entre campos (botão "Next" do teclado)
+  const inputRefs = useRef<Record<string, TextInput | null>>({});
+
+  // Controle de salvamento persistente: guarda o último valor digitado por campo
+  // e um timer de debounce. O ref garante que o valor mais recente sempre esteja
+  // disponível de forma síncrona, mesmo se o componente perder o foco/desmontar
+  // antes do timer disparar.
+  const pendentesRef = useRef<Record<string, PendenciaSalvar>>({});
+  const timersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
   const carregar = useCallback(async () => {
     const [lojaEncontrada, estoque] = await Promise.all([
       buscarLoja(lojaId),
@@ -52,8 +68,18 @@ export default function LojaDetalheScreen() {
   useFocusEffect(
     useCallback(() => {
       carregar();
+      // Cleanup: roda sempre que a tela perde o foco (sair da loja, trocar de aba, etc.)
+      // Garante que qualquer digitação pendente seja salva, mesmo com o teclado
+      // ainda aberto e sem o campo ter disparado blur/onEndEditing.
+      return () => {
+        salvarTudoPendente();
+      };
     }, [carregar])
   );
+
+  function chaveCampo(produtoId: number, campo: CampoQuantidade) {
+    return `${produtoId}-${campo}`;
+  }
 
   const secoes: Secao[] = useMemo(() => {
     const grupos: Secao[] = [];
@@ -120,16 +146,64 @@ export default function LojaDetalheScreen() {
     );
   }
 
-  function atualizarLocal(produtoId: number, campo: 'estoque' | 'prateleira', valor: string) {
+  function atualizarLocal(produtoId: number, campo: CampoQuantidade, valor: string) {
     const numero = valor.trim() === '' ? null : Number(valor.replace(/[^0-9]/g, ''));
     setItens((atual) =>
       atual.map((item) => (item.produto_id === produtoId ? { ...item, [campo]: numero } : item))
     );
   }
 
-  async function salvarQuantidade(produtoId: number, campo: 'estoque' | 'prateleira', valor: string) {
-    const numero = valor.trim() === '' ? null : Number(valor.replace(/[^0-9]/g, ''));
-    await atualizarQuantidade(lojaId, produtoId, campo, numero);
+  // Converte o texto digitado em número válido. Retorna undefined se o valor
+  // for uma "aberração" (não numérico) e não deve ser salvo.
+  function normalizarNumero(valor: string): number | null | undefined {
+    if (valor.trim() === '') return null;
+    const numero = Number(valor.replace(/[^0-9]/g, ''));
+    if (Number.isNaN(numero)) return undefined;
+    return numero;
+  }
+
+  async function salvarPendencia(chave: string) {
+    const pendencia = pendentesRef.current[chave];
+    if (!pendencia) return;
+    delete pendentesRef.current[chave];
+    if (timersRef.current[chave]) {
+      clearTimeout(timersRef.current[chave]);
+      delete timersRef.current[chave];
+    }
+
+    const numero = normalizarNumero(pendencia.valor);
+    if (numero === undefined) return; // valor inválido, não persiste
+
+    await atualizarQuantidade(lojaId, pendencia.produtoId, pendencia.campo, numero);
+  }
+
+  function salvarTudoPendente() {
+    Object.keys(pendentesRef.current).forEach((chave) => {
+      salvarPendencia(chave);
+    });
+  }
+
+  // Chamado a cada tecla digitada: atualiza a tela na hora e agenda o salvamento
+  // (debounced) no banco. Se o usuário sair da tela antes do debounce disparar,
+  // o cleanup do useFocusEffect acima chama salvarTudoPendente() e nada se perde.
+  function handleAlterarQuantidade(produtoId: number, campo: CampoQuantidade, valor: string) {
+    atualizarLocal(produtoId, campo, valor);
+
+    const chave = chaveCampo(produtoId, campo);
+    pendentesRef.current[chave] = { produtoId, campo, valor };
+
+    if (timersRef.current[chave]) clearTimeout(timersRef.current[chave]);
+    timersRef.current[chave] = setTimeout(() => {
+      salvarPendencia(chave);
+    }, ATRASO_SALVAMENTO_MS);
+  }
+
+  // Quando o campo perde o foco normalmente (ex: usuário tocou em outro lugar),
+  // salva na hora em vez de esperar o debounce.
+  function handleFimEdicao(produtoId: number, campo: CampoQuantidade, valor: string) {
+    const chave = chaveCampo(produtoId, campo);
+    pendentesRef.current[chave] = { produtoId, campo, valor };
+    salvarPendencia(chave);
   }
 
   function fonteImagem(item: ItemEstoque | Produto) {
@@ -159,9 +233,11 @@ export default function LojaDetalheScreen() {
 
       <SectionList
         sections={secoes}
+        style={{ flex: 1 }}
         keyExtractor={(item) => String(item.produto_id)}
         contentContainerStyle={{ paddingBottom: 24 }}
         stickySectionHeadersEnabled
+        keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
           <Text style={styles.vazio}>
             Nenhum produto nesta loja ainda. Toque em "Adicionar produto do catálogo" acima.
@@ -174,6 +250,9 @@ export default function LojaDetalheScreen() {
         )}
         renderItem={({ item }) => {
           const imagem = fonteImagem(item);
+          const chaveVendas = chaveCampo(item.produto_id, 'prateleira');
+          const chaveDeposito = chaveCampo(item.produto_id, 'estoque');
+
           return (
             <View style={styles.itemLinha}>
               {imagem ? (
@@ -185,26 +264,38 @@ export default function LojaDetalheScreen() {
               <Text style={styles.itemNome} numberOfLines={2}>
                 {item.nome}
               </Text>
-                <View style={styles.campoQuantidade}>
-                  <Text style={styles.rotuloQuantidade}>Vendas</Text>
-                  <TextInput
-                    style={styles.inputQuantidade}
-                    keyboardType="numeric"
-                    value={item.prateleira === null ? '' : String(item.prateleira)}
-                    onChangeText={(v) => atualizarLocal(item.produto_id, 'prateleira', v)}
-                    onEndEditing={(e) => salvarQuantidade(item.produto_id, 'prateleira', e.nativeEvent.text)}
-                  />
-                </View>
 
-                <View style={styles.quantidades}>
+              <View style={styles.campoQuantidade}>
+                <Text style={styles.rotuloQuantidade}>Vendas</Text>
+                <TextInput
+                  ref={(el) => {
+                    inputRefs.current[chaveVendas] = el;
+                  }}
+                  style={styles.inputQuantidade}
+                  keyboardType="numeric"
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  value={item.prateleira === null ? '' : String(item.prateleira)}
+                  onChangeText={(v) => handleAlterarQuantidade(item.produto_id, 'prateleira', v)}
+                  onEndEditing={(e) => handleFimEdicao(item.produto_id, 'prateleira', e.nativeEvent.text)}
+                  onSubmitEditing={() => inputRefs.current[chaveDeposito]?.focus()}
+                />
+              </View>
+
+              <View style={styles.quantidades}>
                 <View style={styles.campoQuantidade}>
                   <Text style={styles.rotuloQuantidade}>Depósito</Text>
                   <TextInput
+                    ref={(el) => {
+                      inputRefs.current[chaveDeposito] = el;
+                    }}
                     style={styles.inputQuantidade}
                     keyboardType="numeric"
+                    returnKeyType="done"
                     value={item.estoque === null ? '' : String(item.estoque)}
-                    onChangeText={(v) => atualizarLocal(item.produto_id, 'estoque', v)}
-                    onEndEditing={(e) => salvarQuantidade(item.produto_id, 'estoque', e.nativeEvent.text)}
+                    onChangeText={(v) => handleAlterarQuantidade(item.produto_id, 'estoque', v)}
+                    onEndEditing={(e) => handleFimEdicao(item.produto_id, 'estoque', e.nativeEvent.text)}
+                    onSubmitEditing={() => Keyboard.dismiss()}
                   />
                 </View>
               </View>

@@ -48,6 +48,7 @@ export default function ProdutosOrdemScreen() {
 
       <FlatList
         data={produtos}
+        style={{ flex: 1 }}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={{ paddingBottom: 24 }}
         ListEmptyComponent={
